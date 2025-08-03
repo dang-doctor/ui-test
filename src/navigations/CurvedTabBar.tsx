@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components/native';
 import TABS from '../constants/curveTabs';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Dimensions, StyleSheet, TouchableOpacity, View, Animated } from 'react-native';
+import { Dimensions, StyleSheet, TouchableOpacity, View, Animated, Easing } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 // import FontAwesome from "react-native-vector-icons/FontAwesome";
@@ -20,6 +20,21 @@ const curveWidth = floatingBtnSize * 2.0;
 const curveHeight = floatingBtnSize * 0.8;
 const sidePadding = 24;
 
+const getCurvePath = (centerX : number) => {
+    const left = centerX - curveWidth / 2;
+    const right = centerX + curveWidth / 2;
+    return `
+        M0 0
+        H${left}
+        C${left + curveWidth * 0.15} 0, ${centerX - curveWidth * 0.27} ${curveHeight}, ${centerX} ${curveHeight}
+        C${centerX + curveWidth * 0.27} ${curveHeight}, ${right - curveWidth * 0.15} 0, ${right} 0
+        H${width}
+        V${tabHeight}
+        H0
+        Z
+    `;
+}
+
 const CurvedTabBar = ({ activeKey, onTabPress } : any) => {
     const activeIdx = TABS.findIndex(tab => tab.key === activeKey);
     const tabCount = TABS.length;
@@ -27,45 +42,70 @@ const CurvedTabBar = ({ activeKey, onTabPress } : any) => {
     const tabWidth = tabAreaWidth / tabCount;
 
     // 곡선 중심점 계산
-    const curveCenterX = sidePadding + tabWidth * activeIdx + tabWidth / 2;
-    const left = curveCenterX - curveWidth / 2;
-    const right = curveCenterX + curveWidth / 2;
+    // const curveCenterX = sidePadding + tabWidth * activeIdx + tabWidth / 2;
+    // const left = curveCenterX - curveWidth / 2;
+    // const right = curveCenterX + curveWidth / 2;
+    const initialCurveCenterX = sidePadding + tabWidth * activeIdx + tabWidth / 2;
+    const curveCenterX = useRef(new Animated.Value(initialCurveCenterX)).current;
+
+    const [curvePath, setCurvePath] = useState(getCurvePath(initialCurveCenterX));
 
     // btn animation
     const FLOAT_HEIGHT = 30;
     const floatingAnim = useRef(new Animated.Value(0)).current;
+
     useEffect(() => {
+        const targetCenterX = sidePadding + tabWidth * activeIdx + tabWidth / 2;
+
+        // tab curve
+        Animated.timing(curveCenterX, {
+            toValue: targetCenterX,
+            duration: 280,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: false,
+        }).start();
+
+        //btn
         floatingAnim.setValue(0); // 초기화
         Animated.spring(floatingAnim, {
             toValue: 1,
             friction: 6,
             useNativeDriver: true,
         }).start();
-    }, [activeKey]);
+    }, [activeKey, tabWidth]);
 
     const translateY = floatingAnim.interpolate({
         inputRange: [0, 1],
         outputRange: [FLOAT_HEIGHT, 0],
     });
 
+    useEffect(() => {
+        const id = curveCenterX.addListener(({ value }) => {
+            setCurvePath(getCurvePath(value));
+        });
+        // 초기 Path
+        setCurvePath(getCurvePath((curveCenterX as any)._value || initialCurveCenterX));
+        return () => curveCenterX.removeListener(id);
+    }, []);
+
     // SVG Path
-    const path = `
-        M0 0
-        H${left}
-        C${left + curveWidth * 0.15} 0, ${curveCenterX - curveWidth * 0.27} ${curveHeight}, ${curveCenterX} ${curveHeight}
-        C${curveCenterX + curveWidth * 0.27} ${curveHeight}, ${right - curveWidth * 0.15} 0, ${right} 0
-        H${width}
-        V${tabHeight}
-        H0
-        Z
-    `;
+    // const path = `
+    //     M0 0
+    //     H${left}
+    //     C${left + curveWidth * 0.15} 0, ${curveCenterX - curveWidth * 0.27} ${curveHeight}, ${curveCenterX} ${curveHeight}
+    //     C${curveCenterX + curveWidth * 0.27} ${curveHeight}, ${right - curveWidth * 0.15} 0, ${right} 0
+    //     H${width}
+    //     V${tabHeight}
+    //     H0
+    //     Z
+    // `;
 
     return (
         <View style={styles.root}>
             {/* 1. NavBar Background (곡선 SVG) */}
             <View style={styles.navBarBg}>
                 <Svg width={width} height={tabHeight} style={{ position: "absolute", bottom: 0 }}>
-                    <Path fill="#fff" d={path} />
+                    <Path fill="#fff" d={curvePath} />
                 </Svg>
             </View>
             {/* 2. 버튼 컨테이너 */}

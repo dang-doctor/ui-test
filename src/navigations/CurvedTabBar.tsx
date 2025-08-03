@@ -16,8 +16,8 @@ type Props = {
 const { width } = Dimensions.get("window");
 const tabHeight = 62;
 const floatingBtnSize = 45;
-const curveWidth = floatingBtnSize * 2.0; // 반원에 근접한 넓이
-const curveHeight = floatingBtnSize * 0.8; // 반원에 근접한 깊이
+const curveWidth = floatingBtnSize * 2.0;
+const curveHeight = floatingBtnSize * 0.8;
 const sidePadding = 24;
 
 const CurvedTabBar = ({ activeKey, onTabPress } : any) => {
@@ -32,15 +32,23 @@ const CurvedTabBar = ({ activeKey, onTabPress } : any) => {
     const right = curveCenterX + curveWidth / 2;
 
     // btn animation
-    const floatingY = useRef(new Animated.Value(0)).current;
-    useEffect(()=>{
-        Animated.spring(floatingY, {
+    const FLOAT_HEIGHT = 30;
+    const floatingAnim = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+        floatingAnim.setValue(0); // 초기화
+        Animated.spring(floatingAnim, {
             toValue: 1,
+            friction: 6,
             useNativeDriver: true,
         }).start();
-    },[activeKey])
+    }, [activeKey]);
 
-    // 부드러운 반원형 곡선 Path
+    const translateY = floatingAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [FLOAT_HEIGHT, 0],
+    });
+
+    // SVG Path
     const path = `
         M0 0
         H${left}
@@ -69,13 +77,14 @@ const CurvedTabBar = ({ activeKey, onTabPress } : any) => {
                     if (focused) {
                         // 플로팅 버튼 (곡선 파임 위)
                         return (
-                            <View
+                            <Animated.View
                                 key={tab.key}
                                 style={[
                                     styles.floatingBtn,
                                     {
                                         left: x,
                                         bottom: tabHeight - curveHeight - floatingBtnSize / 2 + 30,
+                                        transform: [{translateY}],
                                     }
                                 ]}
                             >
@@ -86,7 +95,7 @@ const CurvedTabBar = ({ activeKey, onTabPress } : any) => {
                                 >
                                     <Ionicons name={tab.icon} size={32} color="#7C88FF" />
                                 </TouchableOpacity>
-                            </View>
+                            </Animated.View>
                         );
                     }
                     // 일반 버튼
